@@ -1,0 +1,7 @@
+{
+  "name": "Tennis gogogo",
+  "description": "A professional tennis swing analysis application offering pro comparisons, detailed metrics, and personalized drills.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
