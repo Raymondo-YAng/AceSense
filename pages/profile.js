@@ -35,6 +35,70 @@ function ProCard({ image, name }) {
 }
 
 function ProfileView() {
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false); // State to manage login status
+  const [username, setUsername] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setError('');
+    try {
+      const response = await fetch('http://localhost:8000/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          username: username,
+          password: password,
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Login failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('access_token', data.access_token);
+      setIsLoggedIn(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (!isLoggedIn) {
+    return React.createElement('div', { className: 'bg-background min-h-screen flex items-center justify-center' },
+      React.createElement('div', { className: 'bg-card p-8 rounded-lg shadow-lg w-96' },
+        React.createElement('h2', { className: 'text-white text-2xl font-bold mb-6 text-center' }, 'Login'),
+        error && React.createElement('p', { className: 'text-danger text-center mb-4' }, error),
+        React.createElement('form', { onSubmit: handleLogin, className: 'flex flex-col gap-4' },
+          React.createElement('input', {
+            type: 'text',
+            placeholder: 'Username',
+            className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+            value: username,
+            onChange: (e) => setUsername(e.target.value),
+            required: true,
+          }),
+          React.createElement('input', {
+            type: 'password',
+            placeholder: 'Password',
+            className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+            value: password,
+            onChange: (e) => setPassword(e.target.value),
+            required: true,
+          }),
+          React.createElement('button', {
+            type: 'submit',
+            className: 'bg-primary text-background font-bold p-3 rounded-md hover:bg-primary/80 transition-colors',
+          }, 'Login')
+        )
+      )
+    );
+  }
+
   return React.createElement('div', { className: 'bg-background pb-8' },
     React.createElement('div', { className: 'flex items-center p-4 pb-2 justify-between' },
       React.createElement('h2', { className: 'text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pl-12' }, 'Profile'),

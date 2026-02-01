@@ -38,6 +38,18 @@ function ExerciseItem({ category, desc }) {
 }
 
 function AnalysisView() {
+  const [videoUrl, setVideoUrl] = React.useState(null);
+  const [isError, setIsError] = React.useState(false);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get('videoUrl');
+    if (url) {
+      // Assuming backend runs on localhost:8000
+      setVideoUrl(`http://localhost:8000${url}`);
+    }
+  }, []);
+
   return React.createElement('div', { className: 'bg-background pb-8' },
     React.createElement('div', { className: 'flex items-center bg-background p-4 pb-2 justify-between sticky top-0 z-10' },
       React.createElement('button', { onClick: () => window.history.back(), className: 'text-white flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-white/10 transition-colors' },
@@ -53,17 +65,36 @@ function AnalysisView() {
       React.createElement(MetricCard, { label: 'Follow Through', value: '80°', delta: '+10%', isPositive: true })
     ),
 
-    React.createElement('h2', { className: 'text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5' }, 'Comparison to Pro'),
+    React.createElement('h2', { className: 'text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5' }, videoUrl ? 'Your Analysis Video' : 'Comparison to Pro'),
     React.createElement('div', { className: 'p-4' },
-      React.createElement('div', {
-        className: 'relative flex items-center justify-center bg-white bg-cover bg-center aspect-video rounded-lg p-4 shadow-lg overflow-hidden group cursor-pointer',
-        style: { backgroundImage: `url("${IMAGES.ANALYSIS_VIDEO_PLACEHOLDER}")` }
-      },
-        React.createElement('div', { className: 'absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors' }),
-        React.createElement('button', { className: 'flex shrink-0 items-center justify-center rounded-full size-16 bg-black/40 text-white backdrop-blur-sm z-10 transition-transform group-hover:scale-110' },
-          React.createElement(Play, { size: 24, fill: 'currentColor' })
+      videoUrl ? 
+        React.createElement('div', { className: 'relative aspect-video rounded-lg overflow-hidden bg-card flex items-center justify-center' },
+          isError ? 
+            React.createElement('div', { className: 'flex flex-col items-center gap-2 p-4 text-center' },
+              React.createElement('p', { className: 'text-white font-medium' }, 'Video is being processed...'),
+              React.createElement('p', { className: 'text-secondary text-sm' }, 'Please wait a few seconds and refresh the page.'),
+              React.createElement('button', { 
+                onClick: () => window.location.reload(),
+                className: 'mt-2 px-4 py-2 bg-primary text-background rounded-full font-bold text-sm'
+              }, 'Refresh Now')
+            ) :
+            React.createElement('video', {
+              src: videoUrl,
+              controls: true,
+              className: 'w-full h-full object-contain',
+              onError: () => setIsError(true),
+              autoPlay: true
+            })
+        ) :
+        React.createElement('div', {
+          className: 'relative flex items-center justify-center bg-white bg-cover bg-center aspect-video rounded-lg p-4 shadow-lg overflow-hidden group cursor-pointer',
+          style: { backgroundImage: `url("${IMAGES.ANALYSIS_VIDEO_PLACEHOLDER}")` }
+        },
+          React.createElement('div', { className: 'absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors' }),
+          React.createElement('button', { className: 'flex shrink-0 items-center justify-center rounded-full size-16 bg-black/40 text-white backdrop-blur-sm z-10 transition-transform group-hover:scale-110' },
+            React.createElement(Play, { size: 24, fill: 'currentColor' })
+          )
         )
-      )
     ),
 
     React.createElement('div', { className: 'flex flex-wrap gap-4 px-4 py-6' },

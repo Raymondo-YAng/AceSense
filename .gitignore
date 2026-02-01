@@ -22,3 +22,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# AI Models
+*.pt
+
+# Uploads and Processed Media
+public/videos/*
+!public/videos/.gitkeep
+public/marked_videos/*
+!public/marked_videos/.gitkeep
+backend/avatars/*
+!backend/avatars/.gitkeep
