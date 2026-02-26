@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import BottomNavigation from '../components/BottomNavigation.js';
 import Button from '../components/Button.js';
 import { X } from 'lucide-react';
+import { IMAGES, API_BASE_URL } from '../constants.js';
 
 function UploadView() {
   const fileInputRef = React.useRef(null);
@@ -22,7 +23,7 @@ function UploadView() {
 
     try {
       // Use the actual backend URL
-      const response = await fetch('http://localhost:8000/upload-video', {
+      const response = await fetch(`${API_BASE_URL}/upload-video`, {
         method: 'POST',
         body: formData,
       });

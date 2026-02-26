@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import BottomNavigation from '../components/BottomNavigation.js';
 import { ArrowLeft, Play, Zap, Target, ArrowRight, Dumbbell } from 'lucide-react';
-import { IMAGES } from '../constants.js';
+import { IMAGES, API_BASE_URL } from '../constants.js';
 
 function MetricCard({ label, value, delta, isPositive }) {
   return React.createElement('div', { className: 'flex min-w-[150px] flex-1 flex-col gap-2 rounded-lg p-6 border border-accent bg-card/20' },
@@ -45,8 +45,7 @@ function AnalysisView() {
     const params = new URLSearchParams(window.location.search);
     const url = params.get('videoUrl');
     if (url) {
-      // Assuming backend runs on localhost:8000
-      setVideoUrl(`http://localhost:8000${url}`);
+      setVideoUrl(`${API_BASE_URL}${url}`);
     }
   }, []);
 

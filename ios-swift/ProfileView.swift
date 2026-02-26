@@ -173,7 +173,8 @@ struct ProfileView: View {
         isLoading = true
         defer { isLoading = false }
 
-        guard let url = URL(string: "http://localhost:8000/token") else {
+        let backendURL = "http://localhost:8000"
+        guard let url = URL(string: "\(backendURL)/token") else {
             errorMessage = "Invalid backend URL."
             return
         }

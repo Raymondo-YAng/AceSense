@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import BottomNavigation from '../components/BottomNavigation.js';
 import { Settings } from 'lucide-react';
-import { IMAGES } from '../constants.js';
+import { IMAGES, API_BASE_URL } from '../constants.js';
 
 function StatCard({ value, label }) {
   return React.createElement('div', { className: 'flex min-w-[111px] flex-1 basis-[fit-content] flex-col gap-2 rounded-lg border border-accent p-3 items-center text-center bg-card/20' },
@@ -54,7 +54,7 @@ function ProfileView() {
     event.preventDefault();
     resetMessages();
     try {
-      const response = await fetch('http://localhost:8000/token', {
+      const response = await fetch(`${API_BASE_URL}/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -117,7 +117,7 @@ function ProfileView() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/users/', {
+      const response = await fetch(`${API_BASE_URL}/users/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
