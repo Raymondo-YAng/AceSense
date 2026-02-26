@@ -36,13 +36,23 @@ function ProCard({ image, name }) {
 
 function ProfileView() {
   const [isLoggedIn, setIsLoggedIn] = React.useState(false); // State to manage login status
+  const [authMode, setAuthMode] = React.useState('login');
   const [username, setUsername] = React.useState('');
+  const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
   const [error, setError] = React.useState('');
+  const [successMessage, setSuccessMessage] = React.useState('');
+  const [profileData, setProfileData] = React.useState(null);
+
+  const resetMessages = () => {
+    setError('');
+    setSuccessMessage('');
+  };
 
   const handleLogin = async (event) => {
     event.preventDefault();
-    setError('');
+    resetMessages();
     try {
       const response = await fetch('http://localhost:8000/token', {
         method: 'POST',
@@ -62,7 +72,73 @@ function ProfileView() {
 
       const data = await response.json();
       localStorage.setItem('access_token', data.access_token);
+      const profileInfo = { username };
+      localStorage.setItem('profile_data', JSON.stringify(profileInfo));
+      setProfileData(profileInfo);
       setIsLoggedIn(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    const storedProfile = localStorage.getItem('profile_data');
+    if (token && storedProfile) {
+      try {
+        const parsed = JSON.parse(storedProfile);
+        setProfileData(parsed);
+        setUsername(parsed.username || '');
+      } catch (parseError) {
+        console.error('Failed to parse stored profile data', parseError);
+        localStorage.removeItem('profile_data');
+      }
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('profile_data');
+    setIsLoggedIn(false);
+    setProfileData(null);
+    setUsername('');
+    setPassword('');
+    resetMessages();
+  };
+
+  const handleRegister = async (event) => {
+    event.preventDefault();
+    resetMessages();
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/users/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          email,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Registration failed');
+      }
+
+      await response.json();
+      setSuccessMessage('Account created successfully. Please log in.');
+      setAuthMode('login');
+      setPassword('');
+      setConfirmPassword('');
     } catch (err) {
       setError(err.message);
     }
@@ -71,30 +147,88 @@ function ProfileView() {
   if (!isLoggedIn) {
     return React.createElement('div', { className: 'bg-background min-h-screen flex items-center justify-center' },
       React.createElement('div', { className: 'bg-card p-8 rounded-lg shadow-lg w-96' },
-        React.createElement('h2', { className: 'text-white text-2xl font-bold mb-6 text-center' }, 'Login'),
-        error && React.createElement('p', { className: 'text-danger text-center mb-4' }, error),
-        React.createElement('form', { onSubmit: handleLogin, className: 'flex flex-col gap-4' },
-          React.createElement('input', {
-            type: 'text',
-            placeholder: 'Username',
-            className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
-            value: username,
-            onChange: (e) => setUsername(e.target.value),
-            required: true,
-          }),
-          React.createElement('input', {
-            type: 'password',
-            placeholder: 'Password',
-            className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
-            value: password,
-            onChange: (e) => setPassword(e.target.value),
-            required: true,
-          }),
+        React.createElement('div', { className: 'flex gap-2 mb-6 bg-background/40 p-1 rounded-full' },
           React.createElement('button', {
-            type: 'submit',
-            className: 'bg-primary text-background font-bold p-3 rounded-md hover:bg-primary/80 transition-colors',
-          }, 'Login')
-        )
+            className: `flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${authMode === 'login' ? 'bg-primary text-background' : 'text-secondary hover:text-white'}`,
+            onClick: () => {
+              setAuthMode('login');
+              resetMessages();
+            },
+            type: 'button'
+          }, 'Login'),
+          React.createElement('button', {
+            className: `flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${authMode === 'register' ? 'bg-primary text-background' : 'text-secondary hover:text-white'}`,
+            onClick: () => {
+              setAuthMode('register');
+              resetMessages();
+            },
+            type: 'button'
+          }, 'Register')
+        ),
+        React.createElement('h2', { className: 'text-white text-2xl font-bold mb-4 text-center' }, authMode === 'login' ? 'Welcome back' : 'Create your account'),
+        error && React.createElement('p', { className: 'text-danger text-center mb-4' }, error),
+        successMessage && React.createElement('p', { className: 'text-success text-center mb-4' }, successMessage),
+        authMode === 'login'
+          ? React.createElement('form', { onSubmit: handleLogin, className: 'flex flex-col gap-4' },
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Username',
+                className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+                value: username,
+                onChange: (e) => setUsername(e.target.value),
+                required: true,
+              }),
+              React.createElement('input', {
+                type: 'password',
+                placeholder: 'Password',
+                className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+                value: password,
+                onChange: (e) => setPassword(e.target.value),
+                required: true,
+              }),
+              React.createElement('button', {
+                type: 'submit',
+                className: 'bg-primary text-background font-bold p-3 rounded-md hover:bg-primary/80 transition-colors',
+              }, 'Login')
+            )
+          : React.createElement('form', { onSubmit: handleRegister, className: 'flex flex-col gap-4' },
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Username',
+                className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+                value: username,
+                onChange: (e) => setUsername(e.target.value),
+                required: true,
+              }),
+              React.createElement('input', {
+                type: 'email',
+                placeholder: 'Email',
+                className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+                value: email,
+                onChange: (e) => setEmail(e.target.value),
+                required: true,
+              }),
+              React.createElement('input', {
+                type: 'password',
+                placeholder: 'Password',
+                className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+                value: password,
+                onChange: (e) => setPassword(e.target.value),
+                required: true,
+              }),
+              React.createElement('input', {
+                type: 'password',
+                placeholder: 'Confirm Password',
+                className: 'p-3 rounded-md bg-surface text-white border border-accent focus:outline-none focus:ring-2 focus:ring-primary',
+                value: confirmPassword,
+                onChange: (e) => setConfirmPassword(e.target.value),
+                required: true,
+              }),
+              React.createElement('button', {
+                type: 'submit',
+                className: 'bg-primary text-background font-bold p-3 rounded-md hover:bg-primary/80 transition-colors',
+              }, 'Create Account')
+            )
       )
     );
   }
@@ -103,8 +237,15 @@ function ProfileView() {
     React.createElement('div', { className: 'flex items-center p-4 pb-2 justify-between' },
       React.createElement('h2', { className: 'text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pl-12' }, 'Profile'),
       React.createElement('div', { className: 'flex w-12 items-center justify-end' },
-        React.createElement('button', { className: 'text-white p-2 rounded-full hover:bg-white/10 transition-colors' },
-          React.createElement(Settings, { size: 24 })
+        isLoggedIn ? (
+          React.createElement('button', {
+            onClick: handleLogout,
+            className: 'text-white text-sm font-semibold'
+          }, 'Logout')
+        ) : (
+          React.createElement('button', { className: 'text-white p-2 rounded-full hover:bg-white/10 transition-colors' },
+            React.createElement(Settings, { size: 24 })
+          )
         )
       )
     ),
@@ -116,9 +257,11 @@ function ProfileView() {
           style: { backgroundImage: `url("${IMAGES.USER_AVATAR}")` }
         }),
         React.createElement('div', { className: 'flex flex-col items-center justify-center' },
-          React.createElement('p', { className: 'text-white text-[22px] font-bold leading-tight tracking-[-0.015em] text-center' }, 'Ethan Carter'),
-          React.createElement('p', { className: 'text-secondary text-base font-normal leading-normal text-center' }, 'Pro Tennis Player'),
-          React.createElement('p', { className: 'text-secondary text-base font-normal leading-normal text-center' }, 'Joined 2022')
+          React.createElement('p', { className: 'text-white text-[22px] font-bold leading-tight tracking-[-0.015em] text-center' },
+            profileData?.username || 'Your Name'
+          ),
+          React.createElement('p', { className: 'text-secondary text-base font-normal leading-normal text-center' }, 'AceSense Member'),
+          React.createElement('p', { className: 'text-secondary text-base font-normal leading-normal text-center' }, 'Joined 2026')
         )
       )
     ),
