@@ -7,6 +7,7 @@ from typing import Annotated
 from datetime import timedelta
 import shutil
 import os
+import subprocess
 import cv2
 from ultralytics import YOLO
 
@@ -37,6 +38,37 @@ try:
     model = YOLO('yolo11n-pose.pt')
 except Exception:
     model = YOLO('yolov8n-pose.pt')
+
+def ensure_h264_encoding(video_path: str):
+    """Re-encode the video using ffmpeg/libx264 so browsers can play it reliably."""
+    if shutil.which("ffmpeg") is None:
+        print("Skipping H.264 transcode because ffmpeg is not installed")
+        return
+
+    temp_output = f"{os.path.splitext(video_path)[0]}_h264.mp4"
+    ffmpeg_cmd = [
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-pix_fmt", "yuv420p",
+        temp_output,
+    ]
+
+    try:
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            os.replace(temp_output, video_path)
+            print(f"Re-encoded {video_path} with libx264 for browser compatibility")
+        else:
+            print(f"FFmpeg failed to re-encode {video_path}: {result.stderr}")
+            if os.path.exists(temp_output):
+                os.remove(temp_output)
+    except Exception as exc:
+        print(f"Unexpected error while running ffmpeg on {video_path}: {exc}")
+        if os.path.exists(temp_output):
+            os.remove(temp_output)
+
 
 def process_video_task(input_path: str, output_path: str):
     cap = cv2.VideoCapture(input_path)
@@ -84,6 +116,7 @@ def process_video_task(input_path: str, output_path: str):
         
     cap.release()
     out.release()
+    ensure_h264_encoding(output_path)
     print(f"Finished processing video: {output_path}")
 
 # Security settings
