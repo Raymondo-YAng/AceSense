@@ -11,16 +11,17 @@ import cv2
 from ultralytics import YOLO
 
 from . import models, database, schemas, crud, security
+from .security import create_access_token
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
-# CORS configuration
+# CORS configuration (fully open per user request)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
