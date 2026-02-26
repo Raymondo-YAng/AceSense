@@ -48,15 +48,21 @@ def process_video_task(input_path: str, output_path: str):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     
-    # Use 'avc1' (H.264) for better browser compatibility. 
-    # Fallback to 'mp4v' if 'avc1' is not available in the environment.
-    fourcc = cv2.VideoWriter_fourcc(*'avc1')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-    
-    if not out.isOpened():
-        print("Warning: 'avc1' codec failed. Falling back to 'mp4v'.")
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # Many VPS/VM environments lack hardware H.264 encoders. Default to the
+    # software-friendly 'mp4v' (MPEG-4 Part 2) codec for reliability, but still
+    # attempt 'avc1' (H.264) as a secondary option for better compression.
+    preferred_fourccs = ['mp4v', 'avc1']
+    out = None
+    for codec in preferred_fourccs:
+        fourcc = cv2.VideoWriter_fourcc(*codec)
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        if out.isOpened():
+            if codec != 'mp4v':
+                print(f"Using '{codec}' codec for {output_path}")
+            break
+        else:
+            print(f"Warning: '{codec}' codec failed for {output_path}")
+            out = None
 
     if not out.isOpened():
         print(f"Error: Could not create video writer for {output_path}")
