@@ -39,15 +39,60 @@ function ExerciseItem({ category, desc }) {
 
 function AnalysisView() {
   const [videoUrl, setVideoUrl] = React.useState(null);
-  const [isError, setIsError] = React.useState(false);
+  const [videoStatus, setVideoStatus] = React.useState('idle'); // idle | processing | ready
+  const [hasVideoParam, setHasVideoParam] = React.useState(false);
+  const videoBaseUrlRef = React.useRef(null);
+  const retryTimeoutRef = React.useRef(null);
+
+  const clearRetryTimeout = React.useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleRetry = React.useCallback(() => {
+    if (!videoBaseUrlRef.current) return;
+    clearRetryTimeout();
+    retryTimeoutRef.current = window.setTimeout(() => {
+      setVideoUrl(`${videoBaseUrlRef.current}?cacheBust=${Date.now()}`);
+    }, 3000);
+  }, [clearRetryTimeout]);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const url = params.get('videoUrl');
+
     if (url) {
-      setVideoUrl(`${API_BASE_URL}${url}`);
+      setHasVideoParam(true);
+      videoBaseUrlRef.current = `${API_BASE_URL}${url}`;
+      setVideoStatus('processing');
+      setVideoUrl(`${videoBaseUrlRef.current}?cacheBust=${Date.now()}`);
+    } else {
+      setHasVideoParam(false);
     }
-  }, []);
+
+    return () => {
+      clearRetryTimeout();
+    };
+  }, [clearRetryTimeout]);
+
+  const handleVideoLoaded = React.useCallback(() => {
+    clearRetryTimeout();
+    setVideoStatus('ready');
+  }, [clearRetryTimeout]);
+
+  const handleVideoError = React.useCallback(() => {
+    if (!videoBaseUrlRef.current) return;
+    setVideoStatus('processing');
+    scheduleRetry();
+  }, [scheduleRetry]);
+
+  const handleManualRefresh = React.useCallback(() => {
+    if (!videoBaseUrlRef.current) return;
+    setVideoStatus('processing');
+    scheduleRetry();
+  }, [scheduleRetry]);
 
   return React.createElement('div', { className: 'bg-background pb-8' },
     React.createElement('div', { className: 'flex items-center bg-background p-4 pb-2 justify-between sticky top-0 z-10' },
@@ -64,25 +109,28 @@ function AnalysisView() {
       React.createElement(MetricCard, { label: 'Follow Through', value: '80°', delta: '+10%', isPositive: true })
     ),
 
-    React.createElement('h2', { className: 'text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5' }, videoUrl ? 'Your Analysis Video' : 'Comparison to Pro'),
+    React.createElement('h2', { className: 'text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5' }, hasVideoParam ? 'Your Analysis Video' : 'Comparison to Pro'),
     React.createElement('div', { className: 'p-4' },
-      videoUrl ? 
+      hasVideoParam ? 
         React.createElement('div', { className: 'relative aspect-video rounded-lg overflow-hidden bg-card flex items-center justify-center' },
-          isError ? 
+          videoStatus !== 'ready' ?
             React.createElement('div', { className: 'flex flex-col items-center gap-2 p-4 text-center' },
               React.createElement('p', { className: 'text-white font-medium' }, 'Video is being processed...'),
-              React.createElement('p', { className: 'text-secondary text-sm' }, 'Please wait a few seconds and refresh the page.'),
-              React.createElement('button', { 
-                onClick: () => window.location.reload(),
+              React.createElement('p', { className: 'text-secondary text-sm' }, 'We will refresh automatically once the marked video is ready.'),
+              React.createElement('button', {
+                onClick: handleManualRefresh,
                 className: 'mt-2 px-4 py-2 bg-primary text-background rounded-full font-bold text-sm'
               }, 'Refresh Now')
             ) :
             React.createElement('video', {
+              key: videoUrl,
               src: videoUrl,
               controls: true,
               className: 'w-full h-full object-contain',
-              onError: () => setIsError(true),
-              autoPlay: true
+              onCanPlay: handleVideoLoaded,
+              onError: handleVideoError,
+              autoPlay: true,
+              playsInline: true
             })
         ) :
         React.createElement('div', {
