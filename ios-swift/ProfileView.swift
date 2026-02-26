@@ -3,216 +3,296 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject private var appState: AppState
 
-    @State private var username: String = ""
-    @State private var password: String = ""
-    @State private var errorMessage: String?
-    @State private var isLoading = false
+    @State private var authMode: AuthMode = .login
+    @State private var username = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmPassword = ""
+    @State private var errorMessage = ""
+    @State private var successMessage = ""
+    @State private var isSubmitting = false
 
     var body: some View {
         Group {
-            if !appState.isLoggedIn {
-                loginView
-            } else {
+            if appState.isLoggedIn {
                 profileContent
+            } else {
+                authView
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AceColor.background.ignoresSafeArea())
     }
 
-    private var loginView: some View {
-        VStack(spacing: 24) {
-            Text("Login")
-                .font(.title.weight(.bold))
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.footnote)
-                    .multilineTextAlignment(.center)
-            }
-
-            VStack(spacing: 12) {
-                TextField("Username", text: $username)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
-
-                SecureField("Password", text: $password)
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
-            }
-
-            Button {
-                Task {
-                    await login()
+    private var authView: some View {
+        VStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    authModeButton(.login, title: "Login")
+                    authModeButton(.register, title: "Register")
                 }
-            } label: {
-                Text(isLoading ? "Logging in..." : "Login")
-                    .font(.system(size: 17, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(isLoading ? Color.gray : Color.green)
-                    .foregroundColor(.black)
-                    .cornerRadius(14)
-            }
-            .disabled(isLoading || username.isEmpty || password.isEmpty)
+                .padding(4)
+                .background(AceColor.background.opacity(0.4))
+                .clipShape(Capsule())
+                .padding(.bottom, 20)
 
-            Spacer()
-        }
-        .padding()
-    }
+                Text(authMode == .login ? "Welcome back" : "Create your account")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.bottom, 14)
 
-    private var profileContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundColor(AceColor.danger)
+                        .multilineTextAlignment(.center)
+                        .padding(.bottom, 12)
+                }
+
+                if !successMessage.isEmpty {
+                    Text(successMessage)
+                        .font(.footnote)
+                        .foregroundColor(AceColor.success)
+                        .multilineTextAlignment(.center)
+                        .padding(.bottom, 12)
+                }
+
                 VStack(spacing: 12) {
-                    Circle()
-                        .fill(Color(.secondarySystemBackground))
-                        .frame(width: 120, height: 120)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 48))
-                                .foregroundColor(.white)
-                        )
-                    VStack(spacing: 4) {
-                        Text("Ethan Carter")
-                            .font(.title2.weight(.bold))
-                        Text("Pro Tennis Player")
-                            .foregroundColor(.secondary)
-                        Text("Joined 2022")
-                            .foregroundColor(.secondary)
+                    authTextField("Username", text: $username)
+
+                    if authMode == .register {
+                        authTextField("Email", text: $email)
+                    }
+
+                    authSecureField("Password", text: $password)
+
+                    if authMode == .register {
+                        authSecureField("Confirm Password", text: $confirmPassword)
                     }
                 }
 
-                HStack(spacing: 12) {
-                    statCard(value: "120", label: "Swings Analyzed")
-                    statCard(value: "85%", label: "Accuracy")
-                    statCard(value: "4.8", label: "Avg. Rating")
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Recent Analysis")
-                        .font(.title3.weight(.bold))
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            analysisCard(title: "Forehand Swing", date: "2024-07-20")
-                            analysisCard(title: "Backhand Swing", date: "2024-07-15")
-                            analysisCard(title: "Serve", date: "2024-07-10")
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Pro Swings Library")
-                        .font(.title3.weight(.bold))
-                    HStack(spacing: 12) {
-                        proCard(name: "Roger Federer")
-                        proCard(name: "Serena Williams")
-                        proCard(name: "Rafael Nadal")
-                    }
-                }
-
-                Button(role: .destructive) {
-                    appState.isLoggedIn = false
-                    appState.accessToken = nil
+                Button {
+                    Task { await submitAuth() }
                 } label: {
-                    Text("Log Out")
-                        .font(.system(size: 15, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(Color(.secondarySystemBackground))
-                        .foregroundColor(.red)
-                        .cornerRadius(12)
+                    Text(buttonTitle)
                 }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.top, 16)
+                .disabled(isSubmitting)
             }
+            .padding(24)
+            .frame(maxWidth: 420)
+            .background(AceColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
             .padding()
         }
     }
 
-    private func statCard(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.title3.weight(.bold))
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+    private var profileContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Spacer()
+                    Text("Profile")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button {
+                        appState.logout()
+                        resetMessages()
+                        password = ""
+                        confirmPassword = ""
+                    } label: {
+                        Text("Logout")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 56, alignment: .trailing)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+
+                VStack(spacing: 16) {
+                    AsyncCircleAvatar(url: AceSenseImages.userAvatar)
+                    VStack(spacing: 4) {
+                        Text(appState.profileData?.username ?? "Your Name")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("AceSense Member")
+                            .font(.system(size: 16))
+                            .foregroundColor(AceColor.secondary)
+                        Text("Joined 2026")
+                            .font(.system(size: 16))
+                            .foregroundColor(AceColor.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+
+                HStack(spacing: 10) {
+                    statCard(value: "120", label: "Swings Analyzed")
+                    statCard(value: "85%", label: "Accuracy")
+                    statCard(value: "4.8", label: "Avg. Rating")
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+
+                sectionTitle("Recent Analysis")
+                    .padding(.top, 12)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        analysisCard(imageURL: AceSenseImages.Swings.forehand, title: "Forehand Swing", date: "2024-07-20")
+                        analysisCard(imageURL: AceSenseImages.Swings.backhand, title: "Backhand Swing", date: "2024-07-15")
+                        analysisCard(imageURL: AceSenseImages.Swings.serve, title: "Serve", date: "2024-07-10")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                }
+
+                sectionTitle("Pro Swings Library")
+                    .padding(.top, 12)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    proCard(imageURL: AceSenseImages.Pros.federer, name: "Roger Federer")
+                    proCard(imageURL: AceSenseImages.Pros.serena, name: "Serena Williams")
+                    proCard(imageURL: AceSenseImages.Pros.nadal, name: "Rafael Nadal")
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
     }
 
-    private func analysisCard(title: String, date: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-                .frame(width: 120, height: 160)
+    private func authModeButton(_ mode: AuthMode, title: String) -> some View {
+        Button {
+            authMode = mode
+            resetMessages()
+        } label: {
             Text(title)
-                .font(.body.weight(.medium))
-            Text(date)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(authMode == mode ? AceColor.background : AceColor.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(authMode == mode ? AceColor.primary : Color.clear)
+                .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
     }
 
-    private func proCard(name: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-                .frame(width: 100, height: 140)
-            Text(name)
-                .font(.body.weight(.medium))
-        }
+    private func authTextField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text)
+            .padding(12)
+            .background(AceColor.surface)
+            .foregroundColor(Color.white)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(AceColor.accent, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func login() async {
-        errorMessage = nil
-        isLoading = true
-        defer { isLoading = false }
+    private func authSecureField(_ placeholder: String, text: Binding<String>) -> some View {
+        SecureField(placeholder, text: text)
+            .padding(12)
+            .background(AceColor.surface)
+            .foregroundColor(Color.white)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(AceColor.accent, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
 
-        let backendURL = "http://localhost:8000"
-        guard let url = URL(string: "\(backendURL)/token") else {
-            errorMessage = "Invalid backend URL."
-            return
-        }
+    private var buttonTitle: String {
+        if isSubmitting { return authMode == .login ? "Logging in..." : "Creating account..." }
+        return authMode == .login ? "Login" : "Create Account"
+    }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    private func resetMessages() {
+        errorMessage = ""
+        successMessage = ""
+    }
 
-        let bodyString = "username=\(username)&password=\(password)"
-        request.httpBody = bodyString.data(using: .utf8)
+    private func submitAuth() async {
+        resetMessages()
+        isSubmitting = true
+        defer { isSubmitting = false }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                errorMessage = "Invalid response."
-                return
-            }
-
-            guard (200..<300).contains(http.statusCode) else {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let detail = json["detail"] as? String {
-                    errorMessage = detail
-                } else {
-                    errorMessage = "Login failed with status \(http.statusCode)."
-                }
-                return
-            }
-
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let token = json["access_token"] as? String {
-                appState.accessToken = token
-                appState.isLoggedIn = true
+            if authMode == .login {
+                try await appState.login(username: username, password: password)
             } else {
-                errorMessage = "Unexpected response format."
+                guard password == confirmPassword else {
+                    errorMessage = "Passwords do not match"
+                    return
+                }
+                try await appState.register(username: username, email: email, password: password)
+                successMessage = "Account created successfully. Please log in."
+                authMode = .login
+                password = ""
+                confirmPassword = ""
             }
         } catch {
-            errorMessage = "Network error: \(error.localizedDescription)"
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+    }
+
+    private func statCard(value: String, label: String) -> some View {
+        VStack(spacing: 6) {
+            Text(value)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.white)
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundColor(AceColor.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 8)
+        .background(AceColor.card.opacity(0.2))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AceColor.accent, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func analysisCard(imageURL: URL?, title: String, date: String) -> some View {
+        let cardWidth: CGFloat = 118
+        let imageHeight: CGFloat = 150
+
+        return VStack(alignment: .leading, spacing: 8) {
+            RemoteCardImage(url: imageURL, height: imageHeight, title: title)
+                .frame(width: cardWidth, height: imageHeight)
+                .clipped()
+            Text(title)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(width: cardWidth, alignment: .leading)
+            Text(date)
+                .font(.system(size: 12))
+                .foregroundColor(AceColor.secondary)
+                .frame(width: cardWidth, alignment: .leading)
+        }
+        .frame(width: cardWidth, alignment: .leading)
+        .contentShape(Rectangle())
+        .clipped()
+    }
+
+    private func proCard(imageURL: URL?, name: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RemoteCardImage(url: imageURL, height: 170, title: name)
+            Text(name)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
         }
     }
 }
-

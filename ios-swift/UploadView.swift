@@ -1,75 +1,137 @@
 import SwiftUI
+import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct UploadView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var isUploading = false
-    @State private var errorMessage: String?
+
+    @State private var showImporter = false
+    @State private var alertMessage: String?
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Upload your swing")
-                    .font(.title2.weight(.bold))
+        VStack(spacing: 0) {
+            header
 
-                Text("Upload a video of your tennis swing to get started. Make sure the video is clear and shows your full swing.")
-                    .font(.body)
-                    .foregroundColor(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Upload your swing")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.top, 20)
+                        .padding(.bottom, 8)
 
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.footnote)
+                    Text("Upload a video of your tennis swing to get started. Make sure the video is clear and shows your full swing.")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 12)
+                        .padding(.bottom, 4)
+
+                    if let alertMessage {
+                        Text(alertMessage)
+                            .font(.footnote)
+                            .foregroundColor(AceColor.danger)
+                            .padding(.bottom, 12)
+                    }
+
+                    VStack(spacing: 12) {
+                        Button {
+                            presentVideoPicker()
+                        } label: {
+                            Text(appState.isUploading ? "Uploading and processing..." : "Upload from library")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(appState.isUploading)
+
+                        Button {
+                            presentVideoPicker()
+                        } label: {
+                            Text("Record a new video")
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(appState.isUploading)
+                    }
+                    .padding(.top, 8)
                 }
-
-                Spacer()
-
-                VStack(spacing: 12) {
-                    Button {
-                        simulateUpload()
-                    } label: {
-                        Text(isUploading ? "Uploading and processing..." : "Upload from library")
-                            .font(.system(size: 17, weight: .bold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(isUploading ? Color.gray : Color.green)
-                            .foregroundColor(.black)
-                            .cornerRadius(14)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .background(AceColor.background.ignoresSafeArea())
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: [.movie, .mpeg4Movie]
+        ) { result in
+            switch result {
+            case .success(let fileURL):
+                Task {
+                    let didAccess = fileURL.startAccessingSecurityScopedResource()
+                    defer { if didAccess { fileURL.stopAccessingSecurityScopedResource() } }
+                    do {
+                        alertMessage = nil
+                        try await appState.uploadVideo(fileURL: fileURL)
+                    } catch {
+                        alertMessage = error.localizedDescription
                     }
-                    .disabled(isUploading)
+                }
+            case .failure(let error):
+                alertMessage = error.localizedDescription
+            }
+        }
+    }
 
-                    Button {
-                        simulateUpload()
-                    } label: {
-                        Text("Record a new video")
-                            .font(.system(size: 17, weight: .bold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(Color(.secondarySystemBackground))
-                            .foregroundColor(.white)
-                            .cornerRadius(14)
-                    }
-                    .disabled(isUploading)
+    private func presentVideoPicker() {
+#if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.movie, .mpeg4Movie]
+        panel.prompt = "Select Video"
+
+        let response = panel.runModal()
+        if response == .OK, let fileURL = panel.url {
+            Task {
+                do {
+                    alertMessage = nil
+                    try await appState.uploadVideo(fileURL: fileURL)
+                } catch {
+                    alertMessage = error.localizedDescription
                 }
             }
-            .padding()
-            .navigationTitle("Upload")
         }
+#else
+        showImporter = true
+#endif
     }
 
-    private func simulateUpload() {
-        errorMessage = nil
-        isUploading = true
+    private var header: some View {
+        HStack {
+            Button {
+                appState.selectedTab = .home
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Rectangle())
+            }
 
-        // In a full iOS app you would:
-        // 1. Let the user pick or record a video.
-        // 2. Upload it to http://localhost:8000/upload-video as multipart/form-data.
-        // 3. Read the marked_url from the JSON response and store it in appState.analysisVideoURL.
+            Spacer()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            // For now we just navigate to the Analysis tab.
-            self.isUploading = false
-            self.appState.selectedTab = .analysis
+            Text("Upload")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Color.clear.frame(width: 48, height: 48)
         }
+        .padding(.horizontal, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 }
-
